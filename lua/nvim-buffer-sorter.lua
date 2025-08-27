@@ -10,7 +10,7 @@ function M.setup(params)
 end
 
 function M.shift_left()
-    local current_buffer_index = M_private.get_current_buffer_index()
+    local current_buffer_index = M_private.get_buffer_index(M_external.get_current_buffer_id())
 
     if current_buffer_index < 2 then
         return
@@ -22,7 +22,7 @@ function M.shift_left()
 end
 
 function M.shift_right()
-    local current_buffer_index = M_private.get_current_buffer_index()
+    local current_buffer_index = M_private.get_buffer_index(M_external.get_current_buffer_id())
 
     if current_buffer_index == 0 then
         return
@@ -38,9 +38,9 @@ function M.shift_right()
 end
 
 function M.go_next()
-    current_buffer_index = M_private.get_current_buffer_index()
+    local current_buffer_index = M_private.get_buffer_index(M_external.get_current_buffer_id())
 
-    next_buffer_index = current_buffer_index + 1
+    local next_buffer_index = current_buffer_index + 1
 
     if next_buffer_index > M_private.get_buffers_list_size() then
         return
@@ -50,9 +50,9 @@ function M.go_next()
 end
 
 function M.go_prev()
-    current_buffer_index = M_private.get_current_buffer_index()
+    local current_buffer_index = M_private.get_buffer_index(M_external.get_current_buffer_id())
 
-    prev_buffer_index = current_buffer_index - 1
+    local prev_buffer_index = current_buffer_index - 1
 
     if prev_buffer_index < 1 then
         return
@@ -70,8 +70,6 @@ function M.go_to(buffer_index)
 end
 
 function M.get_buffers_list()
-    -- vim.print(table.concat(M_private.buffers_list, " "))
-
     return M_private.buffers_list
 end
 
@@ -88,11 +86,9 @@ function M_private.get_buffers_list_size()
     return table.getn(M_private.buffers_list)
 end
 
-function M_private.get_current_buffer_index()
-    local current_buffer_id = M_external.get_current_buffer_id()
-
+function M_private.get_buffer_index(buffer_id)
     for i,v in pairs(M_private.buffers_list) do
-        if v == current_buffer_id then
+        if v == buffer_id then
             return i
         end
     end
@@ -105,19 +101,20 @@ function M_private.on_buffer_add(buffer_id)
 end
 
 function M_private.on_buffer_delete(buffer_id)
-    for i,v in pairs(M_private.buffers_list) do
-        if M_private.buffers_list[i] == buffer_id then
-            table.remove(M_private.buffers_list, i)
-            break
-        end
+    local current_buffer_index = M_private.get_buffer_index(buffer_id)
+
+    if current_buffer_index == 0 then
+        return
     end
+
+    table.remove(M_private.buffers_list, current_buffer_index)
 end
 
 function M_private.go_to(buffer_index)
-    vim.cmd('buffer '..M_private.buffers_list[buffer_index])
+    M_external.go_to(M_private.buffers_list[buffer_index])
 end
 
--- external (nvim api dependent)
+-- external (vim API dependent)
 function M_external.get_buffers_list()
     return vim.api.nvim_list_bufs()
 end
@@ -140,6 +137,10 @@ function M_external.create_autocmds()
             M_private.on_buffer_delete(ev.buf)
         end
     })
+end
+
+function M_external.go_to(buffer_id)
+    vim.cmd('buffer '..buffer_id)
 end
 
 function M_external.update_status()
