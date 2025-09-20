@@ -42,11 +42,17 @@ function M.go_next()
 
     local next_buffer_index = current_buffer_index + 1
 
-    if next_buffer_index > M_private.get_buffers_list_size() then
-        return
-    end
+    while true do
+        if next_buffer_index > M_private.get_buffers_list_size() then
+            return
+        end
 
-    M_private.go_to(next_buffer_index)
+        if M_private.go_to(next_buffer_index) then
+            return
+        else
+            next_buffer_index = next_buffer_index + 1
+        end
+    end
 end
 
 function M.go_prev()
@@ -54,11 +60,17 @@ function M.go_prev()
 
     local prev_buffer_index = current_buffer_index - 1
 
-    if prev_buffer_index < 1 then
-        return
-    end
+    while true do
+        if prev_buffer_index < 1 then
+            return
+        end
 
-    M_private.go_to(prev_buffer_index)
+        if M_private.go_to(prev_buffer_index) then
+            return
+        else
+            prev_buffer_index = prev_buffer_index - 1
+        end
+    end
 end
 
 function M.go_to(buffer_index)
@@ -111,7 +123,7 @@ function M_private.on_buffer_delete(buffer_id)
 end
 
 function M_private.go_to(buffer_index)
-    M_external.go_to(M_private.buffers_list[buffer_index])
+    return M_external.go_to(M_private.buffers_list[buffer_index])
 end
 
 -- external (vim API dependent)
@@ -140,7 +152,15 @@ function M_external.create_autocmds()
 end
 
 function M_external.go_to(buffer_id)
-    vim.cmd('buffer '..buffer_id)
+    local status, err = pcall(function()vim.cmd('buffer '..buffer_id)end)
+
+    if err and string.match(err, 'Buffer %d+ does not exist') then
+        M_private.on_buffer_delete(buffer_id)
+
+        return false
+    end
+
+    return true
 end
 
 function M_external.update_status()
